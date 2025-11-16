@@ -1,0 +1,320 @@
+# Performance Optimization Configuration for 1M+ Events/Second
+
+# Kafka Configuration
+kafka:
+  # Broker configuration for high throughput
+  brokers: 100  # Increased from 9 to handle 1M+ events/sec
+  partitions_per_topic: 100
+  replication_factor: 3
+  min_insync_replicas: 2
+
+  # Performance tuning
+  compression_type: "lz4"  # Fast compression
+  batch_size: 1048576  # 1MB batches
+  linger_ms: 10  # Wait up to 10ms to batch messages
+  buffer_memory: 67108864  # 64MB buffer
+
+  # Network threading
+  num_network_threads: 8
+  num_io_threads: 16
+
+  # Log configuration
+  log_segment_bytes: 1073741824  # 1GB segments
+  log_retention_hours: 720  # 30 days
+  log_retention_check_interval_ms: 300000
+
+  # Socket server
+  socket_send_buffer_bytes: 1048576  # 1MB
+  socket_receive_buffer_bytes: 1048576  # 1MB
+  socket_request_max_bytes: 104857600  # 100MB
+
+  # Performance
+  num_replica_fetchers: 4
+  replica_lag_time_max_ms: 10000
+
+  # Zero-copy transfer
+  zero_copy_enabled: true
+
+# Elasticsearch Configuration
+elasticsearch:
+  # Cluster sizing for 1M+ events/sec
+  master_nodes: 5
+  data_nodes: 50  # Increased for higher throughput
+  coordinating_nodes: 10
+  ingest_nodes: 15
+
+  # Node specifications
+  master_node_spec:
+    cpu: "8"
+    memory: "32Gi"
+    storage: "500Gi"
+
+  data_node_spec:
+    cpu: "16"
+    memory: "128Gi"
+    storage: "10Ti"  # NVMe SSD
+    storage_class: "nvme-ssd"
+
+  ingest_node_spec:
+    cpu: "16"
+    memory: "64Gi"
+
+  # Index settings
+  index_settings:
+    number_of_shards: 50  # Distribute load
+    number_of_replicas: 1
+    refresh_interval: "30s"  # Reduce refresh frequency
+    translog_durability: "async"  # Async for performance
+    translog_sync_interval: "30s"
+
+  # Bulk indexing
+  bulk_size: 10000  # Documents per bulk request
+  bulk_workers: 32  # Parallel bulk workers
+  bulk_flush_interval: "10s"
+
+  # Query cache
+  indices_queries_cache_size: "15%"
+  indices_fielddata_cache_size: "20%"
+
+  # Index Lifecycle Management (ILM)
+  ilm_enabled: true
+  hot_phase_duration: "30d"
+  warm_phase_duration: "90d"
+  cold_phase_duration: "365d"
+
+  # Shard allocation
+  cluster_routing_allocation_node_concurrent_recoveries: 8
+  cluster_routing_allocation_disk_watermark_low: "85%"
+  cluster_routing_allocation_disk_watermark_high: "90%"
+
+  # Thread pools
+  thread_pool_write_size: 32
+  thread_pool_write_queue_size: 10000
+  thread_pool_search_size: 32
+  thread_pool_search_queue_size: 10000
+
+# PostgreSQL Configuration
+postgresql:
+  # Instance configuration
+  instances: 1  # Primary
+  replicas: 5  # Read replicas for scaling
+
+  instance_type: "db.r5.12xlarge"
+  cpu: 48
+  memory: "384Gi"
+  storage: "10Ti"
+  storage_type: "io2"  # High IOPS
+  iops: 64000
+
+  # Connection pooling
+  max_connections: 5000
+  connection_pool_size: 100
+  connection_pool_mode: "transaction"
+
+  # Memory settings
+  shared_buffers: "96GB"  # 25% of RAM
+  effective_cache_size: "288GB"  # 75% of RAM
+  maintenance_work_mem: "8GB"
+  work_mem: "128MB"
+  wal_buffers: "256MB"
+
+  # WAL configuration
+  wal_level: "replica"
+  max_wal_senders: 10
+  wal_keep_size: "10GB"
+  checkpoint_timeout: "15min"
+  checkpoint_completion_target: 0.9
+
+  # Performance
+  random_page_cost: 1.1  # For SSD
+  effective_io_concurrency: 200
+  max_worker_processes: 48
+  max_parallel_workers_per_gather: 4
+  max_parallel_workers: 48
+
+  # Partitioning
+  enable_partitionwise_join: true
+  enable_partitionwise_aggregate: true
+
+  # Vacuum
+  autovacuum_max_workers: 8
+  autovacuum_vacuum_cost_delay: "2ms"
+
+# Redis Configuration
+redis:
+  # Cluster mode for scaling
+  cluster_enabled: true
+  cluster_size: 12  # 6 masters, 6 replicas
+
+  instance_type: "cache.r5.4xlarge"
+  cpu: 16
+  memory: "128Gi"
+
+  # Performance
+  maxmemory_policy: "allkeys-lru"
+  maxmemory_samples: 10
+  tcp_backlog: 65536
+  tcp_keepalive: 300
+
+  # Persistence (for caching, minimal persistence)
+  save: "900 1 300 10"  # Reduced save frequency
+  appendonly: false  # Disable AOF for performance
+
+  # Replication
+  repl_diskless_sync: true
+  repl_backlog_size: "256mb"
+
+# Application Layer Optimization
+application:
+  # Event ingestion service
+  ingestion:
+    instances: 50
+    cpu_per_instance: "8"
+    memory_per_instance: "16Gi"
+    max_batch_size: 10000
+    flush_interval_ms: 100
+    workers_per_instance: 32
+
+  # Correlation engine
+  correlation:
+    instances: 30
+    cpu_per_instance: "16"
+    memory_per_instance: "32Gi"
+    rule_cache_size: "10000"
+    max_concurrent_correlations: 1000
+
+  # API gateway
+  api_gateway:
+    instances: 20
+    cpu_per_instance: "8"
+    memory_per_instance: "16Gi"
+    rate_limit: 100000  # requests per second
+    connection_pool_size: 5000
+    timeout_ms: 30000
+
+# Caching Strategy
+caching:
+  # L1 Cache (Application memory)
+  l1:
+    enabled: true
+    size_mb: 512
+    ttl_seconds: 60
+
+  # L2 Cache (Redis)
+  l2:
+    enabled: true
+    ttl_seconds: 3600
+    max_size_mb: 102400  # 100GB across cluster
+
+  # L3 Cache (Query result cache)
+  l3:
+    enabled: true
+    elasticsearch_query_cache: true
+    postgres_query_cache: true
+
+  # Cache warming
+  warm_on_startup: true
+  warm_popular_queries: true
+
+# Network Optimization
+network:
+  # Load balancing
+  load_balancer_type: "nlb"  # Network Load Balancer for low latency
+  cross_zone_lb: true
+
+  # Connection settings
+  tcp_keepalive: true
+  tcp_nodelay: true  # Disable Nagle's algorithm
+
+  # Bandwidth
+  vpc_bandwidth: "100Gbps"
+  inter_az_bandwidth: "25Gbps"
+
+  # DNS
+  dns_caching: true
+  dns_ttl: 60
+
+# Monitoring and Observability
+monitoring:
+  # Metrics collection
+  scrape_interval: "10s"
+  retention: "30d"
+
+  # Distributed tracing
+  tracing_enabled: true
+  sample_rate: 0.1  # 10% sampling for high volume
+
+  # Logging
+  log_level: "INFO"  # Reduce log volume in production
+  structured_logging: true
+  log_sampling: true  # Sample logs at high volume
+
+# Auto-scaling Configuration
+autoscaling:
+  enabled: true
+
+  # Kubernetes HPA
+  ingestion_service:
+    min_replicas: 50
+    max_replicas: 200
+    target_cpu_utilization: 70
+    target_memory_utilization: 80
+    scale_up_stabilization: "60s"
+    scale_down_stabilization: "300s"
+
+  correlation_service:
+    min_replicas: 30
+    max_replicas: 100
+    target_cpu_utilization: 75
+
+  api_gateway:
+    min_replicas: 20
+    max_replicas: 80
+    target_cpu_utilization: 70
+
+  # Cluster autoscaling
+  cluster_autoscaler:
+    enabled: true
+    min_nodes: 100
+    max_nodes: 500
+    scale_down_enabled: true
+    scale_down_delay_after_add: "10m"
+
+# Performance Targets
+targets:
+  event_ingestion_rate: 1000000  # 1M events/second
+  query_latency_p95_ms: 50
+  write_latency_p95_ms: 100
+  api_latency_p95_ms: 200
+  cache_hit_rate: 0.90
+  system_uptime: 0.9999  # 99.99%
+
+# Resource Quotas
+quotas:
+  total_cpu: "10000"  # 10,000 CPUs
+  total_memory: "50Ti"  # 50TB RAM
+  total_storage: "5Pi"  # 5PB storage
+  network_bandwidth: "100Gbps"
+
+# Cost Optimization
+cost_optimization:
+  # Use spot instances for non-critical workloads
+  spot_instances:
+    enabled: true
+    percentage: 30  # 30% spot instances
+
+  # Reserved instances for baseline
+  reserved_instances:
+    enabled: true
+    percentage: 40  # 40% reserved
+    term: "1year"
+
+  # Auto-shutdown non-production
+  auto_shutdown_dev: true
+  auto_shutdown_schedule: "weeknights and weekends"
+
+  # Storage tiering
+  storage_tiering:
+    hot_storage_days: 30
+    warm_storage_days: 90
+    cold_storage_days: 2555  # 7 years
