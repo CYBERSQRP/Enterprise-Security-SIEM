@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  web-portal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: siem-web-portal
+    ports:
+      - "3000:80"
+    networks:
+      - siem-network
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    depends_on:
+      - api-gateway
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # Development service
+  web-portal-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: siem-web-portal-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./index.html:/app/index.html
+      - ./vite.config.ts:/app/vite.config.ts
+    networks:
+      - siem-network
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    profiles:
+      - dev
+
+networks:
+  siem-network:
+    external: true
+    name: enterprise-siem_siem-network
