@@ -1,0 +1,329 @@
+version: '3.8'
+
+services:
+  # AI Security Orchestrator
+  ai-security-orchestrator:
+    build:
+      context: ./services/ai-security-orchestrator
+      dockerfile: Dockerfile
+    ports:
+      - "8085:8085"
+    environment:
+      - PORT=8085
+      - REDIS_ADDR=redis:6379
+      - POSTGRES_URL=postgresql://siem:password@postgres:5432/siem
+      - KAFKA_BROKERS=kafka:9092
+    depends_on:
+      - kafka
+      - redis
+      - postgres
+    networks:
+      - siem-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Quantum Crypto Service
+  quantum-crypto-service:
+    build:
+      context: ./services/quantum-crypto-service
+      dockerfile: Dockerfile
+    ports:
+      - "8086:8086"
+    environment:
+      - PORT=8086
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    networks:
+      - siem-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Edge Security Gateway
+  edge-security-gateway:
+    build:
+      context: ./services/edge-security-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8087:8087"
+    environment:
+      - PORT=8087
+      - REDIS_ADDR=redis:6379
+      - KAFKA_BROKERS=kafka:9092
+    depends_on:
+      - kafka
+      - redis
+    networks:
+      - siem-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Blockchain Audit Service
+  blockchain-audit-service:
+    build:
+      context: ./services/blockchain-audit-service
+      dockerfile: Dockerfile
+    ports:
+      - "8088:8088"
+    environment:
+      - PORT=8088
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_URL=postgresql://siem:password@postgres:5432/siem
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - siem-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Deception Platform
+  deception-platform:
+    build:
+      context: ./services/deception-platform
+      dockerfile: Dockerfile
+    ports:
+      - "8089:8089"
+    environment:
+      - PORT=8089
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_URL=postgresql://siem:password@postgres:5432/siem
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - siem-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Alert Prioritization Service
+  alert-prioritization:
+    build:
+      context: ./services/alert-prioritization
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8090"
+    environment:
+      - PORT=8090
+      - MODEL_PATH=/models
+    volumes:
+      - ml-models:/models
+    networks:
+      - siem-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8090/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AI Analyst Service
+  ai-analyst:
+    build:
+      context: ./services/ai-analyst
+      dockerfile: Dockerfile
+    ports:
+      - "8091:8091"
+    environment:
+      - PORT=8091
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - siem-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8091/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Forensics Investigation Service
+  forensics:
+    build:
+      context: ./services/forensics
+      dockerfile: Dockerfile
+    ports:
+      - "8092:8092"
+    environment:
+      - PORT=8092
+      - EVIDENCE_STORAGE_PATH=/forensics/evidence
+    volumes:
+      - forensics-evidence:/forensics/evidence
+    networks:
+      - siem-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8092/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Performance Optimizer Service
+  performance-optimizer:
+    build:
+      context: ./services/performance-optimizer
+      dockerfile: Dockerfile
+    ports:
+      - "8093:8093"
+    environment:
+      - PORT=8093
+      - CACHE_MAX_SIZE=10000
+      - CACHE_DEFAULT_TTL=300
+      - SLOW_QUERY_THRESHOLD_MS=1000
+    networks:
+      - siem-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8093/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Visualization Engine Service
+  visualization-engine:
+    build:
+      context: ./services/visualization-engine
+      dockerfile: Dockerfile
+    ports:
+      - "8094:8094"
+    environment:
+      - PORT=8094
+      - NODE_ENV=production
+    networks:
+      - siem-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8094/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Infrastructure Services
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=siem
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=siem
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - siem-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U siem"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - siem-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    ports:
+      - "9092:9092"
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+    depends_on:
+      - zookeeper
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - siem-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    ports:
+      - "2181:2181"
+    environment:
+      - ZOOKEEPER_CLIENT_PORT=2181
+      - ZOOKEEPER_TICK_TIME=2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper
+    networks:
+      - siem-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "echo", "ruok", "|", "nc", "localhost", "2181"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - siem-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+networks:
+  siem-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  kafka-data:
+  zookeeper-data:
+  elasticsearch-data:
+  evidence-data:
+  forensics-evidence:
+  ml-models:
