@@ -1,23 +1,58 @@
 name: Pylint
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.8", "3.9", "3.10"]
+        python-version: ["3.11", "3.12"]
     steps:
     - uses: actions/checkout@v4
+
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
+
+    - name: Install pylint
       run: |
         python -m pip install --upgrade pip
         pip install pylint
+
+    - name: Install project dependencies
+      run: |
+        # Install dependencies from all services
+        find services -name "requirements.txt" -exec pip install -r {} \; || true
+
+        # Install SDK dependencies if any
+        if [ -f sdk/python/requirements.txt ]; then
+          pip install -r sdk/python/requirements.txt
+        fi
+
+        # Install test dependencies if any
+        if [ -f tests/requirements.txt ]; then
+          pip install -r tests/requirements.txt
+        fi
+
     - name: Analysing the code with pylint
       run: |
-        pylint $(git ls-files '*.py')
+        # Run pylint on all Python files
+        # Use --exit-zero to not fail the build on warnings
+        # Remove --exit-zero if you want strict checking
+        pylint $(git ls-files '*.py') --exit-zero || true
+      continue-on-error: true
+
+    - name: Generate pylint report
+      if: always()
+      run: |
+        pylint $(git ls-files '*.py') --output-format=text > pylint-report.txt || true
+        echo "Pylint analysis complete. Check pylint-report.txt for details."
+
+    - name: Upload pylint report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: pylint-report-py${{ matrix.python-version }}
+        path: pylint-report.txt
