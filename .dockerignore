@@ -1,0 +1,151 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+*.drawio
+CONTRIBUTING.md
+CODEBASE_OVERVIEW.md
+IMPLEMENTATION_ROADMAP.md
+QUICKSTART.md
+WEB_PORTAL_INTEGRATION_GUIDE.md
+PHASE_*.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn
+.pnp.*
+dist/
+build/
+coverage/
+.next/
+out/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+htmlcov/
+*.cover
+.hypothesis/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+
+# Rust
+target/
+Cargo.lock
+**/*.rs.bk
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Testing
+test-results/
+tests/__pycache__/
+.pytest_cache/
+coverage/
+*.cover
+
+# Environment files
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+*.pem
+*.key
+*.cert
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+
+# Docker
+docker-compose*.yml
+docker-compose*.yaml
+Dockerfile*
+!Dockerfile
+
+# Kubernetes
+infrastructure/
+k8s/
+*.yaml
+*.yml
+!docker-compose.yml
+
+# Data and volumes
+data/
+volumes/
+*.csv
+*.json.gz
+*.parquet
+
+# Scripts
+scripts/
+Makefile
+
+# Monitoring and configs
+monitoring/
+configs/
