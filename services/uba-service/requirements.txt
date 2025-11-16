@@ -1,0 +1,40 @@
+# UBA Service Dependencies
+
+# Web Framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.4.0
+
+# Database
+psycopg2-binary>=2.9.9
+sqlalchemy>=2.0.23
+asyncpg>=0.29.0
+
+# Message Queue
+kafka-python>=2.0.2
+aiokafka>=0.8.1
+
+# ML & Analytics
+scikit-learn>=1.3.0
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.11.0
+
+# Task Queue
+celery>=5.3.4
+redis>=5.0.1
+
+# Monitoring
+prometheus-client>=0.18.0
+
+# Utilities
+python-dotenv>=1.0.0
+pyyaml>=6.0
+loguru>=0.7.0
+httpx>=0.25.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+faker>=20.0.0
