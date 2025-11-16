@@ -1,0 +1,178 @@
+---
+# MITRE ATT&CK Technique Mappings for SIEM
+# Based on MITRE ATT&CK Framework v13
+
+techniques:
+  - id: T1566
+    name: Phishing
+    tactic: Initial Access
+    description: Adversaries may send phishing messages to gain access
+    detection_queries:
+      - type: email
+        conditions:
+          - field: subject
+            operator: matches
+            value: "(?i)(urgent|verify|account|suspended|click here)"
+          - field: attachment_type
+            operator: in
+            value: [".exe", ".scr", ".bat", ".js"]
+
+  - id: T1078
+    name: Valid Accounts
+    tactic: Initial Access
+    description: Adversaries may obtain and abuse credentials of existing accounts
+    detection_queries:
+      - type: authentication
+        conditions:
+          - field: failed_attempts
+            operator: greater_than
+            value: 5
+            timewindow: 300  # 5 minutes
+      - type: authentication
+        conditions:
+          - field: login_location_change
+            operator: equals
+            value: true
+          - field: time_diff_hours
+            operator: less_than
+            value: 2
+
+  - id: T1059
+    name: Command and Scripting Interpreter
+    tactic: Execution
+    description: Adversaries may abuse command and script interpreters
+    detection_queries:
+      - type: process
+        conditions:
+          - field: process_name
+            operator: in
+            value: ["powershell.exe", "cmd.exe", "wscript.exe", "cscript.exe"]
+          - field: command_line
+            operator: matches
+            value: "(?i)(invoke-expression|iex|downloadstring|invoke-webrequest)"
+
+  - id: T1003
+    name: OS Credential Dumping
+    tactic: Credential Access
+    description: Adversaries may attempt to dump credentials
+    detection_queries:
+      - type: process
+        conditions:
+          - field: process_name
+            operator: in
+            value: ["mimikatz.exe", "procdump.exe"]
+      - type: file_access
+        conditions:
+          - field: file_path
+            operator: matches
+            value: "(?i)(sam|system|security)$"
+          - field: process_name
+            operator: not_equals
+            value: "lsass.exe"
+
+  - id: T1021.001
+    name: Remote Desktop Protocol
+    tactic: Lateral Movement
+    description: Adversaries may use RDP to move laterally
+    detection_queries:
+      - type: network
+        conditions:
+          - field: destination_port
+            operator: equals
+            value: 3389
+          - field: source_internal
+            operator: equals
+            value: true
+          - field: destination_internal
+            operator: equals
+            value: true
+
+  - id: T1071
+    name: Application Layer Protocol
+    tactic: Command and Control
+    description: Adversaries may communicate using application layer protocols
+    detection_queries:
+      - type: network
+        conditions:
+          - field: dns_query
+            operator: matches
+            value: "(?i)([a-z0-9]{20,}\\.)(com|net|org)$"  # DGA detection
+      - type: http
+        conditions:
+          - field: user_agent
+            operator: in
+            value: ["curl", "wget", "python-requests", ""]
+
+  - id: T1486
+    name: Data Encrypted for Impact
+    tactic: Impact
+    description: Adversaries may encrypt data to disrupt availability
+    detection_queries:
+      - type: file
+        conditions:
+          - field: file_extension
+            operator: in
+            value: [".encrypted", ".locked", ".crypt"]
+          - field: file_modification_rate
+            operator: greater_than
+            value: 100
+            timewindow: 60
+
+  - id: T1053
+    name: Scheduled Task/Job
+    tactic: Persistence
+    description: Adversaries may abuse task scheduling capabilities
+    detection_queries:
+      - type: process
+        conditions:
+          - field: process_name
+            operator: equals
+            value: "schtasks.exe"
+          - field: command_line
+            operator: contains
+            value: "/create"
+      - type: registry
+        conditions:
+          - field: registry_path
+            operator: matches
+            value: "(?i)software\\\\microsoft\\\\windows\\\\currentversion\\\\run"
+
+  - id: T1562.001
+    name: Disable or Modify Tools
+    tactic: Defense Evasion
+    description: Adversaries may disable security tools
+    detection_queries:
+      - type: process
+        conditions:
+          - field: process_name
+            operator: in
+            value: ["sc.exe", "net.exe"]
+          - field: command_line
+            operator: matches
+            value: "(?i)(stop|disable).*(defender|firewall|antivirus)"
+      - type: registry
+        conditions:
+          - field: registry_path
+            operator: contains
+            value: "Windows Defender"
+          - field: registry_value
+            operator: equals
+            value: "DisableAntiSpyware"
+
+  - id: T1110
+    name: Brute Force
+    tactic: Credential Access
+    description: Adversaries may use brute force techniques
+    detection_queries:
+      - type: authentication
+        conditions:
+          - field: event_id
+            operator: equals
+            value: 4625  # Windows failed logon
+          - field: count
+            operator: greater_than
+            value: 10
+            timewindow: 300
+          - field: source_ip
+            operator: not_equals
+            value: null

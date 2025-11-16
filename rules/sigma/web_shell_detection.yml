@@ -1,0 +1,35 @@
+title: Web Shell Detection
+id: 7e91d860-46a9-4c9f-9c6b-5e5b6e5e5e5e
+status: experimental
+description: Detects potential web shell activity
+references:
+    - https://attack.mitre.org/techniques/T1505/003/
+author: Threat Detection Team
+date: 2024/01/15
+tags:
+    - attack.persistence
+    - attack.t1505.003
+logsource:
+    category: webserver
+detection:
+    selection_paths:
+        cs-uri-stem|contains:
+            - '.php'
+            - '.asp'
+            - '.aspx'
+            - '.jsp'
+    selection_commands:
+        cs-uri-query|contains:
+            - 'cmd='
+            - 'exec='
+            - 'command='
+            - 'system('
+            - 'shell_exec'
+            - 'passthru'
+            - 'eval('
+    selection_status:
+        sc-status: 200
+    condition: selection_paths and selection_commands and selection_status
+falsepositives:
+    - Legitimate web applications
+level: high

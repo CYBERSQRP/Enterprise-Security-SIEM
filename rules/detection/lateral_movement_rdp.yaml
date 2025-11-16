@@ -1,0 +1,57 @@
+---
+name: Lateral Movement via RDP
+id: rule-003
+version: "1.0"
+enabled: true
+severity: high
+description: Detects potential lateral movement using RDP
+
+mitre:
+  tactic: Lateral Movement
+  technique: T1021.001 - Remote Desktop Protocol
+
+rule_type: sequence
+sequence:
+  events:
+    - event_type: "authentication_success"
+      conditions:
+        - field: logon_type
+          operator: equals
+          value: 10  # RDP logon type
+    - event_type: "network_connection"
+      conditions:
+        - field: destination_port
+          operator: equals
+          value: 3389
+  max_span_seconds: 120
+
+conditions:
+  - field: source_internal
+    operator: equals
+    value: true
+  - field: destination_internal
+    operator: equals
+    value: true
+  - field: user_account
+    operator: not_in
+    value: ["admin", "it-support"]
+
+actions:
+  - type: create_alert
+    title: "Lateral Movement Detected via RDP"
+    description: "User {user_account} performed RDP connection from {source_ip} to {destination_ip}"
+  - type: send_notification
+    channel: "slack"
+    template: "lateral_movement_alert"
+  - type: execute_playbook
+    playbook_id: "investigate-lateral-movement"
+
+tags:
+  - lateral-movement
+  - rdp
+  - network
+
+metadata:
+  author: "Detection Engineering"
+  created_at: "2024-01-17"
+  tuning_required: true

@@ -1,0 +1,29 @@
+[package]
+name = "siem-correlator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.35", features = ["full"] }
+actix-web = "4.4"
+actix-rt = "2.9"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.6", features = ["v4", "serde"] }
+log = "0.4"
+env_logger = "0.11"
+async-trait = "0.1"
+thiserror = "1.0"
+rdkafka = { version = "0.36", features = ["cmake-build"] }
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
+sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres", "chrono", "uuid"] }
+regex = "1.10"
+dashmap = "5.5"
+futures = "0.3"
+anyhow = "1.0"
+config = "0.14"
+
+[dev-dependencies]
+mockall = "0.12"

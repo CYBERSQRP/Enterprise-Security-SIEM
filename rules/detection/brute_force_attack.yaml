@@ -1,0 +1,47 @@
+---
+name: Brute Force Attack Detection
+id: rule-001
+version: "1.0"
+enabled: true
+severity: high
+description: Detects potential brute force attacks based on failed login attempts
+
+mitre:
+  tactic: Credential Access
+  technique: T1110 - Brute Force
+  sub_technique: T1110.001 - Password Guessing
+
+rule_type: threshold
+threshold:
+  count: 10
+  timewindow_seconds: 300  # 5 minutes
+  field: source_ip
+
+conditions:
+  - field: event_type
+    operator: equals
+    value: "authentication_failure"
+  - field: result
+    operator: equals
+    value: "failed"
+
+actions:
+  - type: create_alert
+    title: "Brute Force Attack Detected"
+    description: "Multiple failed authentication attempts from {source_ip}"
+  - type: send_notification
+    channel: "slack"
+    template: "security_alert"
+  - type: execute_playbook
+    playbook_id: "brute-force-response"
+
+tags:
+  - authentication
+  - brute-force
+  - credential-access
+
+metadata:
+  author: "Security Team"
+  created_at: "2024-01-15"
+  references:
+    - "https://attack.mitre.org/techniques/T1110/"

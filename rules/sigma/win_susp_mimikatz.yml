@@ -1,0 +1,31 @@
+title: Mimikatz Credential Dumping
+id: 0e33ce87-7d79-4366-9711-c5a217c66c5a
+status: stable
+description: Detects Mimikatz credential dumping activity
+references:
+    - https://attack.mitre.org/techniques/T1003/
+    - https://github.com/gentilkiwi/mimikatz
+author: Security Team
+date: 2024/01/15
+modified: 2024/01/15
+tags:
+    - attack.credential_access
+    - attack.t1003
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_img:
+        - Image|endswith: '\mimikatz.exe'
+        - OriginalFileName: 'mimikatz.exe'
+    selection_cli:
+        CommandLine|contains:
+            - 'sekurlsa::'
+            - 'lsadump::'
+            - 'vault::cred'
+            - 'kerberos::'
+            - 'crypto::'
+    condition: selection_img or selection_cli
+falsepositives:
+    - Security testing (authorized penetration tests)
+level: critical

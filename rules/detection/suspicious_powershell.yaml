@@ -1,0 +1,48 @@
+---
+name: Suspicious PowerShell Execution
+id: rule-002
+version: "1.0"
+enabled: true
+severity: critical
+description: Detects suspicious PowerShell commands often used in attacks
+
+mitre:
+  tactic: Execution
+  technique: T1059.001 - PowerShell
+
+rule_type: correlation
+correlation:
+  event_types:
+    - "process_creation"
+  correlation_field: "process_id"
+  timewindow_seconds: 60
+
+conditions:
+  - field: process_name
+    operator: matches
+    value: "(?i)powershell\\.exe"
+  - field: command_line
+    operator: matches
+    value: "(?i)(invoke-expression|iex|downloadstring|downloadfile|invoke-webrequest|invoke-restmethod|encodedcommand|bypass|noprofile|hidden|windowstyle)"
+
+actions:
+  - type: create_alert
+    title: "Suspicious PowerShell Command Detected"
+    description: "Potentially malicious PowerShell execution: {command_line}"
+  - type: send_notification
+    channel: "teams"
+    template: "critical_alert"
+  - type: enrich_event
+    enrichment_type: "process_tree"
+
+tags:
+  - powershell
+  - execution
+  - living-off-the-land
+
+metadata:
+  author: "Threat Hunting Team"
+  created_at: "2024-01-16"
+  false_positive_rate: "low"
+  references:
+    - "https://attack.mitre.org/techniques/T1059/001/"
