@@ -1,0 +1,65 @@
+rule_id: rule_001
+version: "1.0.0"
+tenant_id: default
+
+metadata:
+  name: SSH Brute Force Detection
+  description: Detects multiple failed SSH login attempts followed by a successful login
+  author: Security Team
+  tags:
+    - authentication
+    - brute_force
+    - ssh
+    - linux
+
+type: correlation
+category: authentication
+severity: high
+confidence: 0.85
+
+mitre_attack:
+  tactics:
+    - TA0001  # Initial Access
+  techniques:
+    - T1110    # Brute Force
+    - T1110.001  # Password Guessing
+
+logic:
+  type: correlation
+  query: "event.type:authentication AND event.action:failed AND destination.port:22"
+
+  threshold:
+    count: 5
+    timeframe: "5m"
+    group_by:
+      - source.ip
+      - user.username
+
+  followed_by:
+    query: "event.type:authentication AND event.action:success AND destination.port:22"
+    within: "10m"
+    same_fields:
+      - source.ip
+      - user.username
+
+filters:
+  whitelist:
+    source_ips:
+      - 10.0.0.0/8      # Internal network
+      - 172.16.0.0/12   # Internal network
+    users:
+      - monitoring_service
+      - backup_agent
+
+actions:
+  create_alert: true
+  alert_severity: high
+  notify:
+    - soc_team
+  execute_playbook: playbook_brute_force
+  auto_response:
+    - block_ip
+    - notify_soc
+
+enabled: true
+testing_mode: false

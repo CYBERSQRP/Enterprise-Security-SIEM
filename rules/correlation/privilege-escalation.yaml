@@ -1,0 +1,65 @@
+rule_id: rule_003
+version: "1.0.0"
+tenant_id: default
+
+metadata:
+  name: Privilege Escalation Detection
+  description: Detects attempts to escalate privileges using sudo or administrative commands
+  author: Security Team
+  tags:
+    - privilege_escalation
+    - linux
+    - sudo
+    - critical
+
+type: correlation
+category: privilege_escalation
+severity: high
+confidence: 0.90
+
+mitre_attack:
+  tactics:
+    - TA0004  # Privilege Escalation
+  techniques:
+    - T1548    # Abuse Elevation Control Mechanism
+    - T1548.003  # Sudo and Sudo Caching
+
+logic:
+  type: correlation
+  query: "event.type:process AND process.name:sudo AND event.action:executed"
+
+  conditions:
+    - field: user.username
+      operator: not_in
+      value:
+        - root
+        - admin
+        - authorized_admin
+
+    - field: process.command_line
+      operator: contains
+      value:
+        - "/bin/bash"
+        - "/bin/sh"
+        - "su -"
+        - "passwd"
+
+  threshold:
+    count: 3
+    timeframe: "10m"
+    group_by:
+      - user.username
+      - source.hostname
+
+actions:
+  create_alert: true
+  alert_severity: high
+  notify:
+    - soc_team
+  execute_playbook: playbook_privilege_escalation
+  auto_response:
+    - create_incident
+    - notify_security_team
+
+enabled: true
+testing_mode: false

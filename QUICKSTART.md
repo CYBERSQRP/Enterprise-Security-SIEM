@@ -11,22 +11,19 @@ This guide will help you get the SIEM platform running locally for development a
 
 ## Quick Start with Docker Compose
 
-### 1. Clone the Repository
+### 1. Navigate to the Repository
 
 ```bash
-git clone https://github.com/your-org/enterprise-siem.git
-cd enterprise-siem
+cd Enterprise-Security-SIEM
 ```
 
-### 2. Configure Environment
+### 2. Verify Prerequisites
+
+Ensure you have Docker and Docker Compose installed:
 
 ```bash
-# Copy example environment file
-cp .env.example .env
-
-# Edit .env with your preferred settings
-# For local development, defaults should work fine
-nano .env
+docker --version
+docker-compose --version
 ```
 
 ### 3. Start the Platform
@@ -61,11 +58,11 @@ Once all services are running:
 
 - **Web UI**: http://localhost:3000
 - **API Gateway**: http://localhost:8080
-- **Kibana** (Elasticsearch UI): http://localhost:5601
-- **Grafana**: http://localhost:3001 (admin/admin_change_me)
-- **Prometheus**: http://localhost:9090
-- **Jaeger** (Tracing): http://localhost:16686
-- **MinIO**: http://localhost:9001 (minioadmin/minioadmin_change_me)
+- **API Health Check**: http://localhost:8080/health
+- **Elasticsearch**: http://localhost:9200
+- **PostgreSQL**: localhost:5432 (user: siem, password: siem_password)
+- **Redis**: localhost:6379
+- **Kafka**: localhost:9092 (internal), localhost:9093 (external)
 
 ### 6. Send Test Events
 

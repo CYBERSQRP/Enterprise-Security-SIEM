@@ -1,0 +1,58 @@
+rule_id: rule_002
+version: "1.0.0"
+tenant_id: default
+
+metadata:
+  name: Large Data Transfer Detection
+  description: Detects unusual large outbound data transfers that may indicate data exfiltration
+  author: Security Team
+  tags:
+    - data_exfiltration
+    - network
+    - anomaly
+
+type: threshold
+category: data_exfiltration
+severity: critical
+confidence: 0.75
+
+mitre_attack:
+  tactics:
+    - TA0010  # Exfiltration
+  techniques:
+    - T1041    # Exfiltration Over C2 Channel
+    - T1048    # Exfiltration Over Alternative Protocol
+
+logic:
+  type: threshold
+  query: "event.type:network AND network.direction:outbound"
+
+  threshold:
+    count: 1
+    timeframe: "1h"
+    group_by:
+      - source.ip
+      - destination.ip
+    condition: "network.bytes_sent > 1073741824"  # 1GB
+
+filters:
+  whitelist:
+    destination_ips:
+      - 10.0.0.0/8       # Internal network
+      - backup.example.com
+    source_ips:
+      - backup-server-01  # Known backup server
+
+actions:
+  create_alert: true
+  alert_severity: critical
+  notify:
+    - soc_team
+    - security_lead
+  execute_playbook: playbook_data_exfiltration
+  auto_response:
+    - create_incident
+    - notify_soc
+
+enabled: true
+testing_mode: false
