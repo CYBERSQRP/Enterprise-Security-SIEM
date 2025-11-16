@@ -1,0 +1,404 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: siem-phase6
+  labels:
+    phase: "6"
+    environment: production
+
+---
+# Threat Intelligence Aggregator Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: threat-intel-aggregator
+  namespace: siem-phase6
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: threat-intel-aggregator
+  template:
+    metadata:
+      labels:
+        app: threat-intel-aggregator
+        phase: "6"
+    spec:
+      containers:
+      - name: threat-intel-aggregator
+        image: siem/threat-intel-aggregator:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 9090
+          name: metrics
+        env:
+        - name: PORT
+          value: "8080"
+        - name: METRICS_PORT
+          value: "9090"
+        - name: KAFKA_BROKERS
+          value: "kafka:9092"
+        - name: REDIS_ADDR
+          value: "redis:6379"
+        - name: POSTGRES_URL
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: url
+        resources:
+          requests:
+            cpu: "4"
+            memory: "8Gi"
+          limits:
+            cpu: "8"
+            memory: "16Gi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: threat-intel-aggregator
+  namespace: siem-phase6
+spec:
+  selector:
+    app: threat-intel-aggregator
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+  type: ClusterIP
+
+---
+# Supply Chain Monitor Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supply-chain-monitor
+  namespace: siem-phase6
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: supply-chain-monitor
+  template:
+    metadata:
+      labels:
+        app: supply-chain-monitor
+        phase: "6"
+    spec:
+      containers:
+      - name: supply-chain-monitor
+        image: siem/supply-chain-monitor:latest
+        ports:
+        - containerPort: 8081
+          name: http
+        env:
+        - name: PORT
+          value: "8081"
+        - name: REDIS_URL
+          value: "redis://redis:6379"
+        - name: POSTGRES_URL
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: url
+        resources:
+          requests:
+            cpu: "2"
+            memory: "4Gi"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: supply-chain-monitor
+  namespace: siem-phase6
+spec:
+  selector:
+    app: supply-chain-monitor
+  ports:
+  - name: http
+    port: 8081
+    targetPort: 8081
+  type: ClusterIP
+
+---
+# Forensics Collector Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: forensics-collector
+  namespace: siem-phase6
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: forensics-collector
+  template:
+    metadata:
+      labels:
+        app: forensics-collector
+        phase: "6"
+    spec:
+      containers:
+      - name: forensics-collector
+        image: siem/forensics-collector:latest
+        ports:
+        - containerPort: 8082
+          name: http
+        env:
+        - name: PORT
+          value: "8082"
+        - name: EVIDENCE_STORAGE_PATH
+          value: "/data/evidence"
+        volumeMounts:
+        - name: evidence-storage
+          mountPath: /data/evidence
+        resources:
+          requests:
+            cpu: "4"
+            memory: "8Gi"
+          limits:
+            cpu: "8"
+            memory: "16Gi"
+      volumes:
+      - name: evidence-storage
+        persistentVolumeClaim:
+          claimName: evidence-storage-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: forensics-collector
+  namespace: siem-phase6
+spec:
+  selector:
+    app: forensics-collector
+  ports:
+  - name: http
+    port: 8082
+    targetPort: 8082
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: evidence-storage-pvc
+  namespace: siem-phase6
+spec:
+  accessModes:
+  - ReadWriteMany
+  storageClassName: efs
+  resources:
+    requests:
+      storage: 10Ti
+
+---
+# Collaboration Hub Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collaboration-hub
+  namespace: siem-phase6
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: collaboration-hub
+  template:
+    metadata:
+      labels:
+        app: collaboration-hub
+        phase: "6"
+    spec:
+      containers:
+      - name: collaboration-hub
+        image: siem/collaboration-hub:latest
+        ports:
+        - containerPort: 8083
+          name: http
+        - containerPort: 9093
+          name: metrics
+        env:
+        - name: PORT
+          value: "8083"
+        - name: METRICS_PORT
+          value: "9093"
+        - name: REDIS_ADDR
+          value: "redis:6379"
+        - name: POSTGRES_URL
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: url
+        resources:
+          requests:
+            cpu: "4"
+            memory: "8Gi"
+          limits:
+            cpu: "8"
+            memory: "16Gi"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: collaboration-hub
+  namespace: siem-phase6
+spec:
+  selector:
+    app: collaboration-hub
+  ports:
+  - name: http
+    port: 8083
+    targetPort: 8083
+  - name: metrics
+    port: 9093
+    targetPort: 9093
+  type: ClusterIP
+
+---
+# Predictive Analytics Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: predictive-analytics
+  namespace: siem-phase6
+spec:
+  replicas: 10
+  selector:
+    matchLabels:
+      app: predictive-analytics
+  template:
+    metadata:
+      labels:
+        app: predictive-analytics
+        phase: "6"
+    spec:
+      containers:
+      - name: predictive-analytics
+        image: siem/predictive-analytics:latest
+        ports:
+        - containerPort: 8084
+          name: http
+        env:
+        - name: PORT
+          value: "8084"
+        - name: MODEL_UPDATE_INTERVAL
+          value: "86400"
+        resources:
+          requests:
+            cpu: "8"
+            memory: "16Gi"
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: "16"
+            memory: "32Gi"
+            nvidia.com/gpu: "1"
+        volumeMounts:
+        - name: model-storage
+          mountPath: /models
+      volumes:
+      - name: model-storage
+        persistentVolumeClaim:
+          claimName: ml-models-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: predictive-analytics
+  namespace: siem-phase6
+spec:
+  selector:
+    app: predictive-analytics
+  ports:
+  - name: http
+    port: 8084
+    targetPort: 8084
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ml-models-pvc
+  namespace: siem-phase6
+spec:
+  accessModes:
+  - ReadWriteMany
+  storageClassName: efs
+  resources:
+    requests:
+      storage: 1Ti
+
+---
+# Horizontal Pod Autoscaler for Threat Intel Aggregator
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: threat-intel-aggregator-hpa
+  namespace: siem-phase6
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: threat-intel-aggregator
+  minReplicas: 5
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+# Service Monitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: phase6-services
+  namespace: siem-phase6
+spec:
+  selector:
+    matchLabels:
+      phase: "6"
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
