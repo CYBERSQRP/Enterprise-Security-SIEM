@@ -1,0 +1,54 @@
+# Phase 4 Test Dependencies
+
+# Core testing framework
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+pytest-xdist>=3.3.0
+pytest-timeout>=2.1.0
+pytest-env>=0.8.2
+
+# Database
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+alembic>=1.11.0
+
+# Elasticsearch
+elasticsearch>=8.9.0
+
+# Message queue
+kafka-python>=2.0.2
+
+# Cache
+redis>=5.0.0
+
+# HTTP/API testing
+requests>=2.31.0
+responses>=0.23.0
+requests-mock>=1.11.0
+
+# Authentication/SSO testing
+python-saml>=1.15.0
+pyjwt>=2.8.0
+cryptography>=41.0.0
+
+# Data generation and mocking
+faker>=19.2.0
+factory-boy>=3.3.0
+
+# Performance testing
+locust>=2.15.0
+pytest-benchmark>=4.0.0
+
+# Async testing
+aiohttp>=3.8.0
+asyncio>=3.4.3
+
+# Data validation
+pydantic>=2.0.0
+jsonschema>=4.18.0
+
+# Utilities
+python-dateutil>=2.8.0
+pytz>=2023.3
