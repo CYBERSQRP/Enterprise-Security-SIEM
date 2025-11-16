@@ -1,0 +1,356 @@
+version: '3.8'
+
+services:
+  # Zookeeper for Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    hostname: zookeeper
+    container_name: siem-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-logs:/var/lib/zookeeper/log
+    networks:
+      - siem-network
+
+  # Kafka
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    hostname: kafka
+    container_name: siem-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - siem-network
+
+  # Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: siem-elasticsearch
+    environment:
+      - node.name=elasticsearch
+      - cluster.name=siem-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - siem-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # PostgreSQL
+  postgresql:
+    image: postgres:15-alpine
+    container_name: siem-postgresql
+    environment:
+      POSTGRES_DB: siem
+      POSTGRES_USER: siem_user
+      POSTGRES_PASSWORD: siem_password_change_me
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+      - ./scripts/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - siem-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U siem_user -d siem"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: siem-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - siem-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # InfluxDB
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: siem-influxdb
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: admin_password_change_me
+      DOCKER_INFLUXDB_INIT_ORG: siem
+      DOCKER_INFLUXDB_INIT_BUCKET: metrics
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: siem-admin-token-change-me
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    networks:
+      - siem-network
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: siem-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - siem-network
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: siem-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin_change_me
+      GF_INSTALL_PLUGINS: grafana-clock-panel
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - siem-network
+    depends_on:
+      - prometheus
+      - influxdb
+
+  # MinIO (S3-compatible storage for cold data)
+  minio:
+    image: minio/minio:latest
+    container_name: siem-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin_change_me
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - siem-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Jaeger (Distributed Tracing)
+  jaeger:
+    image: jaegertracing/all-in-one:1.51
+    container_name: siem-jaeger
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"
+      - "14250:14250"
+      - "9411:9411"
+    environment:
+      COLLECTOR_ZIPKIN_HOST_PORT: :9411
+      COLLECTOR_OTLP_ENABLED: true
+    networks:
+      - siem-network
+
+  # Kibana (Optional - for Elasticsearch visualization)
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: siem-kibana
+    ports:
+      - "5601:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      ELASTICSEARCH_USERNAME: kibana_system
+      ELASTICSEARCH_PASSWORD: kibana_password
+    depends_on:
+      - elasticsearch
+    networks:
+      - siem-network
+
+  # ====================================
+  # SIEM Services (Development)
+  # ====================================
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    container_name: siem-api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - KAFKA_BROKERS=kafka:9092
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - POSTGRESQL_URL=postgresql://siem_user:siem_password_change_me@postgresql:5432/siem
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=change_me_in_production
+      - LOG_LEVEL=debug
+    depends_on:
+      - kafka
+      - elasticsearch
+      - postgresql
+      - redis
+    networks:
+      - siem-network
+
+  # Log Collector Service
+  collector:
+    build:
+      context: ./services/collector
+      dockerfile: Dockerfile
+    container_name: siem-collector
+    ports:
+      - "514:514/tcp"   # Syslog TCP
+      - "514:514/udp"   # Syslog UDP
+      - "5140:5140"     # Custom log ingestion
+    environment:
+      - KAFKA_BROKERS=kafka:9092
+      - KAFKA_TOPIC=raw-events
+      - LOG_LEVEL=info
+    depends_on:
+      - kafka
+    networks:
+      - siem-network
+
+  # Normalization Service
+  normalizer:
+    build:
+      context: ./services/processor
+      dockerfile: Dockerfile.normalizer
+    container_name: siem-normalizer
+    environment:
+      - KAFKA_BROKERS=kafka:9092
+      - KAFKA_INPUT_TOPIC=raw-events
+      - KAFKA_OUTPUT_TOPIC=normalized-events
+      - KAFKA_CONSUMER_GROUP=normalizer-group
+      - LOG_LEVEL=info
+    depends_on:
+      - kafka
+    networks:
+      - siem-network
+
+  # Enrichment Service
+  enrichment:
+    build:
+      context: ./services/processor
+      dockerfile: Dockerfile.enrichment
+    container_name: siem-enrichment
+    environment:
+      - KAFKA_BROKERS=kafka:9092
+      - KAFKA_INPUT_TOPIC=normalized-events
+      - KAFKA_OUTPUT_TOPIC=enriched-events
+      - KAFKA_CONSUMER_GROUP=enrichment-group
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=info
+    depends_on:
+      - kafka
+      - redis
+    networks:
+      - siem-network
+
+  # Indexer Service (to Elasticsearch)
+  indexer:
+    build:
+      context: ./services/processor
+      dockerfile: Dockerfile.indexer
+    container_name: siem-indexer
+    environment:
+      - KAFKA_BROKERS=kafka:9092
+      - KAFKA_INPUT_TOPIC=enriched-events
+      - KAFKA_CONSUMER_GROUP=indexer-group
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - BATCH_SIZE=1000
+      - BATCH_TIMEOUT=5s
+      - LOG_LEVEL=info
+    depends_on:
+      - kafka
+      - elasticsearch
+    networks:
+      - siem-network
+
+  # Web UI
+  web-ui:
+    build:
+      context: ./web-ui
+      dockerfile: Dockerfile
+    container_name: siem-web-ui
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8080
+      - REACT_APP_WS_URL=ws://localhost:8080
+    depends_on:
+      - api-gateway
+    networks:
+      - siem-network
+
+volumes:
+  zookeeper-data:
+  zookeeper-logs:
+  kafka-data:
+  elasticsearch-data:
+  postgresql-data:
+  redis-data:
+  influxdb-data:
+  prometheus-data:
+  grafana-data:
+  minio-data:
+
+networks:
+  siem-network:
+    driver: bridge
